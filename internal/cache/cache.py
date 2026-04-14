@@ -58,11 +58,19 @@ def compute_cache_key(
 
 
 def lookup(cache_key: str) -> Optional[str]:
+    """Return the layer digest if cache hit and layer file exists."""
+    index = _load_index()
+    digest = index.get(cache_key)
+    if digest and os.path.exists(layer_path(digest)):
+        return digest
     return None
 
 
 def store(cache_key: str, layer_digest: str):
-    pass
+    """Record a cache entry."""
+    index = _load_index()
+    index[cache_key] = layer_digest
+    _save_index(index)
 
 
 def hash_file(path: str) -> str:
