@@ -1,0 +1,7 @@
+# Docksmith has no third-party dependencies.
+# Requires Python 3.8+ with standard library only.
+#
+# System requirements (Linux):
+#   - unshare (util-linux package)
+#   - chroot (util-linux / coreutils)
+#   - root / sudo access
