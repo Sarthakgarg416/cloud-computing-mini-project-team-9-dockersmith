@@ -1,0 +1,13 @@
+# Sample Docksmithfile - uses all 6 required instructions
+FROM alpine-python:3.18
+
+WORKDIR /app
+
+ENV APP_ENV=production
+ENV GREETING=Hello
+
+COPY . /app
+
+RUN sh setup.sh
+
+CMD ["sh", "-c", "python3 /app/main.py"]
