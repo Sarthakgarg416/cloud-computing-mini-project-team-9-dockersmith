@@ -51,11 +51,36 @@ class ImageStore:
             return ImageManifest.from_dict(json.load(f))
 
     def list_images(self):
-        print("TODO: not implemented yet")
+        manifests = self._all_manifests()
+        if not manifests:
+            print("No images found.")
+            return
+        fmt = "{:<20} {:<10} {:<14} {:<30}"
+        print(fmt.format("NAME", "TAG", "ID", "CREATED"))
+        for m in manifests:
+            short_id = m.digest.replace("sha256:", "")[:12]
+            print(fmt.format(m.name, m.tag, short_id, m.created))
 
     def remove_image(self, name_tag: str):
-        print("TODO: not implemented yet")
+        name, tag = _parse_name_tag(name_tag)
+        path = _manifest_path(name, tag)
+        if not os.path.exists(path):
+            print(f"Error: image '{name_tag}' not found.", file=__import__("sys").stderr)
+            raise SystemExit(1)
 
+        with open(path) as f:
+            manifest = ImageManifest.from_dict(json.load(f))
+
+        os.remove(path)
+        removed_layers = 0
+        for layer in manifest.layers:
+            lpath = layer_path(layer.digest)
+            if os.path.exists(lpath):
+                os.remove(lpath)
+                removed_layers += 1
+
+        print(f"Removed image {name_tag} and {removed_layers} layer file(s).")
+        
     def _all_manifests(self) -> List[ImageManifest]:
         results = []
         for fn in sorted(os.listdir(IMAGES_DIR)):
