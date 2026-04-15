@@ -43,6 +43,7 @@ def pull_and_save(docker_tag: str, tar_path: str):
 
 def import_image(tar_path: str, name_tag: str):
     print(f"  Importing {tar_path} as {name_tag} ...")
+    # Reuse the current interpreter so the import step sees the same Python environment.
     result = subprocess.run(
         [sys.executable, "docksmith-import.py", tar_path, name_tag]
     )
@@ -70,6 +71,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="docksmith_setup_") as tmpdir:
         for docker_tag, docksmith_tag in IMAGES:
             print(f"\nProcessing: {docker_tag}")
+            # The tarball is only an intermediate handoff between docker save and import.
             tar_path = os.path.join(tmpdir, docker_tag.replace(":", "_").replace("/", "_") + ".tar")
             pull_and_save(docker_tag, tar_path)
             import_image(tar_path, docksmith_tag)
