@@ -14,7 +14,6 @@ Requirements: the image tar must already be downloaded. No network access is per
 import hashlib
 import json
 import os
-import shutil
 import sys
 import tarfile
 import tempfile
@@ -64,7 +63,7 @@ def import_docker_tar(tar_path: str, name_tag: str):
         with open(manifest_json_path) as f:
             docker_manifest = json.load(f)
 
-        # Take first image
+        # Take the first image entry because docker save can bundle multiple tags.
         entry = docker_manifest[0]
         config_file = entry.get("Config", "")
         layer_tars = entry.get("Layers", [])
@@ -88,10 +87,6 @@ def import_docker_tar(tar_path: str, name_tag: str):
             if not os.path.exists(layer_tar_abs):
                 print(f"Warning: layer tar not found: {layer_tar_rel}", file=sys.stderr)
                 continue
-
-            # Read raw tar bytes
-            with open(layer_tar_abs, "rb") as f:
-                raw = f.read()
 
             # Re-create a reproducible tar for consistency
             # Extract to temp, then re-tar with our sorting/zeroing
