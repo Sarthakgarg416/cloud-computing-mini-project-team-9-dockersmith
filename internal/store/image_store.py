@@ -2,9 +2,9 @@
 Image store - manages image manifests and layer files on disk.
 """
 
-import os
 import json
-import shutil
+import os
+import sys
 from typing import Optional, List
 
 from internal.image.manifest import ImageManifest
@@ -65,7 +65,7 @@ class ImageStore:
         name, tag = _parse_name_tag(name_tag)
         path = _manifest_path(name, tag)
         if not os.path.exists(path):
-            print(f"Error: image '{name_tag}' not found.", file=__import__("sys").stderr)
+            print(f"Error: image '{name_tag}' not found.", file=sys.stderr)
             raise SystemExit(1)
 
         with open(path) as f:
@@ -89,6 +89,7 @@ class ImageStore:
                     try:
                         results.append(ImageManifest.from_dict(json.load(f)))
                     except Exception:
+                        # Skip malformed manifest files so one bad entry does not break listing.
                         pass
         return results
 
