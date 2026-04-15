@@ -29,9 +29,26 @@ def _sorted_tar_entries(src_dir: str) -> List[Tuple[str, str]]:
 
 
 def create_layer_tar(delta_dir: str) -> bytes:
+    """
+    Create a reproducible tar from delta_dir.
+    - Entries in sorted lexicographic order
+    - Timestamps zeroed out for reproducibility
+    """
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w") as tar:
-        tar.add(delta_dir, arcname=".")
+        entries = _sorted_tar_entries(delta_dir)
+        for arcname, abspath in entries:
+            info = tar.gettarinfo(abspath, arcname=arcname)
+            info.mtime = 0
+            info.uid = 0
+            info.gid = 0
+            info.uname = ""
+            info.gname = ""
+            if info.isfile():
+                with open(abspath, "rb") as f:
+                    tar.addfile(info, f)
+            else:
+                tar.addfile(info)
     return buf.getvalue()
 
 
