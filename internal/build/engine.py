@@ -22,7 +22,7 @@ from internal.build.layers import (
 from internal.cache import cache as cache_mod
 from internal.image.manifest import ImageManifest, ImageConfig, LayerEntry
 from internal.store.image_store import ImageStore, layer_path
-import subprocess as _sp
+from internal.runtime.isolate import pick_isolator
 
 # Files written by the isolation setup that must never appear in a layer delta
 _ISOLATION_FILES = {
@@ -101,10 +101,24 @@ class BuildEngine:
                 config.Cmd = parse_cmd_args(instr.args)
 
             elif instr.name == "COPY":
-                raise NotImplementedError("COPY not implemented yet")
+                layer_entry, hit, elapsed = self._handle_copy(
+                    instr, prev_digest, workdir, env_state, layers, cache_busted
+                )
+                if layer_entry:
+                    layers.append(layer_entry)
+                    prev_digest = layer_entry.digest
+                if not hit:
+                    cache_busted = True
 
             elif instr.name == "RUN":
-                raise NotImplementedError("RUN not implemented yet")
+                layer_entry, hit, elapsed = self._handle_run(
+                    instr, prev_digest, workdir, env_state, layers, base_manifest, cache_busted
+                )
+                if layer_entry:
+                    layers.append(layer_entry)
+                    prev_digest = layer_entry.digest
+                if not hit:
+                    cache_busted = True
 
         total_elapsed = time.time() - start_total
 
@@ -292,11 +306,11 @@ class BuildEngine:
             # Snapshot rootfs BEFORE isolation setup writes any files (resolv.conf etc)
             before_files = _all_files(rootfs)
 
-            _cmd_str = " ".join(__import__("shlex").quote(a) for a in command)
-            result = _sp.run(
-                ["chroot", rootfs, "/bin/sh", "-c",
-                f"cd {__import__('shlex').quote(workdir or '/')} 2>/dev/null || cd /; exec {_cmd_str}"],
-                env=env, stdin=_sp.DEVNULL,
+            result = pick_isolator(
+                rootfs,
+                command,
+                workdir=workdir or "/",
+                env=env,
             )
 
             if result.returncode != 0:
