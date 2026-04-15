@@ -30,6 +30,7 @@ def parse(context_dir: str) -> List[Instruction]:
 
     for lineno, raw in enumerate(lines, start=1):
         line = raw.strip()
+        # Blank lines and full-line comments are ignored so the file stays Dockerfile-like.
         if not line or line.startswith("#"):
             continue
 
