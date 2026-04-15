@@ -114,7 +114,6 @@ def run_isolated_simple(
     )
 
 
-# ✅ UPDATED: always use simple chroot
 def pick_isolator(
     rootfs: str,
     command: List[str],
@@ -126,11 +125,7 @@ def pick_isolator(
     if env is None:
         env = {}
 
-    return run_isolated_simple(
-        rootfs,
-        command,
-        workdir=workdir,
-        env=env,
-        capture_output=capture_output,
-        interactive=interactive,
-    )
+    check = subprocess.run(["which", "unshare"], capture_output=True)
+    fn = run_isolated if check.returncode == 0 else run_isolated_simple
+    return fn(rootfs, command, workdir=workdir, env=env,
+               capture_output=capture_output, interactive=interactive)
