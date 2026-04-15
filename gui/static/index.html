@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docksmith — Container Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0f14; --bg-panel:#111318; --bg-card:#161a23; --bg-hover:#1c2130; --bg-input:#0a0c10;
+  --border:#1f2840; --border-hi:#2d3f5a;
+  --accent:#00c6ff; --accent2:#ff7043; --accent3:#4ade80; --accent4:#a78bfa; --accent5:#facc15;
+  --text:#b8c9dc; --text-dim:#4a6280; --text-hi:#e8f2ff; --text-code:#7ec8f8;
+  --hit:#4ade80; --miss:#ff7043; --err:#f87171; --warn:#facc15; --info:#60a5fa;
+  --r:4px; --r-lg:8px; --font-mono:'JetBrains Mono',monospace; --font-ui:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:13px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,198,255,.008) 2px,rgba(0,198,255,.008) 4px);pointer-events:none;z-index:9999}
+.shell{display:grid;grid-template-columns:200px 1fr;grid-template-rows:52px 1fr;height:100vh;overflow:hidden}
+/* Topbar */
+.topbar{grid-column:1/-1;background:var(--bg-panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;position:relative}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent) 30%,var(--accent4) 70%,transparent);opacity:.5}
+.logo{font-family:var(--font-ui);font-size:18px;font-weight:800;color:var(--text-hi);display:flex;align-items:center;gap:10px;letter-spacing:-.3px;flex-shrink:0}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--accent4));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 0 12px rgba(0,198,255,.3)}
+.topbar-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
+.health-dot{width:8px;height:8px;border-radius:50%;background:var(--accent3);box-shadow:0 0 8px var(--accent3);animation:pulse-dot 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar-stats{display:flex;gap:20px;margin-left:4px}
+.topbar-stat{display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:12px}
+.topbar-stat .val{color:var(--text-hi);font-weight:600}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.refresh-btn{background:none;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;padding:4px 10px;border-radius:var(--r);font-family:var(--font-mono);font-size:11px;display:flex;align-items:center;gap:5px;transition:all .15s}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+.refresh-btn.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.time-disp{color:var(--text-dim);font-size:11px}
+/* Sidebar */
+.sidebar{background:var(--bg-panel);border-right:1px solid var(--border);overflow-y:auto;padding:12px 0;display:flex;flex-direction:column}
+.nav-sec-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);padding:10px 16px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;color:var(--text-dim);border-left:2px solid transparent;transition:all .15s;font-size:12px;font-weight:500;user-select:none}
+.nav-item:hover{background:var(--bg-hover);color:var(--text)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,198,255,.07)}
+.nav-item svg{width:14px;height:14px;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--bg-hover);color:var(--text-dim);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600}
+.nav-item.active .nav-badge{background:rgba(0,198,255,.15);color:var(--accent)}
+.sidebar-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border);font-size:10px;color:var(--text-dim);line-height:1.8}
+/* Main */
+.main{overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.view{display:none;flex-direction:column;gap:16px;animation:fadeIn .2s ease}
+.view.active{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* Stat grid */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;position:relative;overflow:hidden;transition:border-color .15s}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--card-accent,var(--accent))}
+.stat-card:hover{border-color:var(--border-hi)}
+.stat-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.stat-value{font-family:var(--font-ui);font-size:28px;font-weight:700;color:var(--text-hi);line-height:1;margin-bottom:4px}
+.stat-sub{font-size:11px;color:var(--text-dim)}
+.stat-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:28px;opacity:.08}
+/* Panel */
+.panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.panel-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+.panel-title{font-family:var(--font-ui);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.2px}
+.panel-sub{font-size:11px;color:var(--text-dim)}
+.panel-acts{margin-left:auto;display:flex;gap:6px;align-items:center}
+.panel-bd{padding:16px}
+/* Grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.g21{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:var(--r);font-family:var(--font-mono);font-size:11px;font-weight:500;cursor:pointer;border:1px solid;transition:all .15s;white-space:nowrap}
+.btn-primary{background:rgba(0,198,255,.12);border-color:var(--accent);color:var(--accent)}
+.btn-primary:hover{background:rgba(0,198,255,.22)}
+.btn-danger{background:rgba(248,113,113,.1);border-color:var(--err);color:var(--err)}
+.btn-danger:hover{background:rgba(248,113,113,.2)}
+.btn-ghost{background:none;border-color:var(--border);color:var(--text-dim)}
+.btn-ghost:hover{border-color:var(--border-hi);color:var(--text)}
+.btn-warn{background:rgba(250,204,21,.1);border-color:var(--warn);color:var(--warn)}
+.btn-sm{padding:3px 8px;font-size:10px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+/* Table */
+.ds-table{width:100%;border-collapse:collapse;font-size:12px}
+.ds-table th{text-align:left;padding:8px 12px;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:600;border-bottom:1px solid var(--border)}
+.ds-table td{padding:9px 12px;border-bottom:1px solid rgba(31,40,64,.5);vertical-align:middle}
+.ds-table tr:last-child td{border-bottom:none}
+.ds-table tr:hover td{background:var(--bg-hover)}
+/* Tags */
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;background:var(--bg-hover);color:var(--text-dim)}
+.tg{background:rgba(74,222,128,.12);color:var(--hit)}
+.to{background:rgba(255,112,67,.12);color:var(--miss)}
+.tb{background:rgba(0,198,255,.12);color:var(--accent)}
+.tp{background:rgba(167,139,250,.12);color:var(--accent4)}
+.tr{background:rgba(248,113,113,.12);color:var(--err)}
+.ty{background:rgba(250,204,21,.12);color:var(--warn)}
+/* Terminal */
+.term{background:#080a0e;border:1px solid var(--border);border-radius:var(--r);padding:14px;min-height:160px;max-height:400px;overflow-y:auto;font-size:12px;line-height:1.7;scroll-behavior:smooth}
+.term::-webkit-scrollbar{width:4px}
+.term::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+.tl{white-space:pre-wrap;word-break:break-all}
+.tl.hit{color:var(--hit)} .tl.miss{color:var(--miss)} .tl.err{color:var(--err)}
+.tl.step{color:var(--accent)} .tl.done{color:var(--accent3);font-weight:600} .tl.meta{color:var(--text-dim)}
+.t-empty{color:var(--text-dim);font-style:italic;font-size:11px}
+/* Forms */
+.frow{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.flbl{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.6px}
+.finput,.fsel{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:7px 10px;font-family:var(--font-mono);font-size:12px;width:100%;transition:border-color .15s;outline:none}
+.finput:focus,.fsel:focus{border-color:var(--accent)}
+.finput::placeholder{color:var(--text-dim)}
+.chk-row{display:flex;align-items:center;gap:8px;cursor:pointer}
+.chk-row input{accent-color:var(--accent);cursor:pointer}
+/* Layer bar chart */
+.lbars{display:flex;flex-direction:column;gap:6px}
+.lbar-row{display:flex;align-items:center;gap:10px}
+.lbar-lbl{flex:0 0 170px;font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.lbar-track{flex:1;height:22px;background:var(--bg-hover);border-radius:var(--r);overflow:hidden;position:relative}
+.lbar-fill{height:100%;border-radius:var(--r);transition:width .5s ease;position:relative}
+.lbar-fill::after{content:attr(data-lbl);position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(255,255,255,.7);white-space:nowrap}
+.lbar-sz{flex:0 0 70px;font-size:11px;color:var(--text-dim);text-align:right}
+/* Donut */
+.donut-wrap{display:flex;align-items:center;gap:24px}
+.donut-leg{display:flex;flex-direction:column;gap:8px}
+.donut-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.donut-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.donut-val{color:var(--text-hi);font-weight:600;margin-left:auto}
+/* Timeline */
+.tl-wrap{display:flex;flex-direction:column}
+.tl-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.tl-item:last-child{border-bottom:none}
+.tl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.tl-dot.miss{background:var(--miss);box-shadow:0 0 6px var(--miss)}
+.tl-dot.running{background:var(--warn);box-shadow:0 0 6px var(--warn)}
+.tl-content{flex:1}
+.tl-title{font-size:12px;color:var(--text);font-weight:500;display:flex;align-items:center;gap:6px}
+.tl-meta{font-size:10px;color:var(--text-dim);margin-top:1px}
+/* Modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--bg-card);border:1px solid var(--border-hi);border-radius:var(--r-lg);width:720px;max-width:90vw;max-height:80vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:modalIn .2s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(-8px)}to{opacity:1;transform:none}}
+.modal-hd{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.modal-title{font-family:var(--font-ui);font-size:16px;font-weight:700;color:var(--text-hi)}
+.modal-close{margin-left:auto;cursor:pointer;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:var(--r);padding:4px 10px;font-size:11px;transition:all .15s}
+.modal-close:hover{border-color:var(--err);color:var(--err)}
+/* Env editor */
+.env-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center}
+.env-row input{background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--r);font-family:var(--font-mono);font-size:11px;outline:none;transition:border-color .15s}
+.env-row input:focus{border-color:var(--accent4)}
+.env-rm{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:4px 6px;border-radius:var(--r);font-size:14px}
+.env-rm:hover{background:rgba(248,113,113,.15);color:var(--err)}
+/* Env tags */
+.env-list{display:flex;flex-wrap:wrap;gap:6px}
+.env-tag{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);border-radius:var(--r);padding:3px 8px;font-size:11px;color:var(--accent4)}
+/* Progress */
+.prog-bar{height:4px;background:var(--bg-hover);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent4));border-radius:2px;transition:width .3s ease}
+/* Status dots */
+.sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sdot.ok{background:var(--hit);box-shadow:0 0 4px var(--hit)}
+.sdot.err{background:var(--err);box-shadow:0 0 4px var(--err)}
+/* Utils */
+.sep{width:100%;height:1px;background:var(--border)}
+.mt4{margin-top:4px} .mt8{margin-top:8px} .mt12{margin-top:12px}
+.flex{display:flex} .fxc{display:flex;align-items:center}
+.g8{gap:8px} .g12{gap:12px}
+.grow{flex:1} .dim{color:var(--text-dim)} .hi{color:var(--text-hi)}
+code{background:rgba(0,198,255,.08);border:1px solid rgba(0,198,255,.15);color:var(--text-code);padding:1px 5px;border-radius:3px;font-size:11px}
+.empty-st{text-align:center;padding:40px 20px;color:var(--text-dim)}
+.scrl{overflow-y:auto;max-height:320px}
+.view-hd{display:flex;align-items:center;gap:12px}
+.view-title{font-family:var(--font-ui);font-size:18px;font-weight:700;color:var(--text-hi);letter-spacing:-.3px}
+.view-sub{color:var(--text-dim);font-size:11px}
+.view-acts{margin-left:auto;display:flex;gap:8px}
+@media(max-width:1100px){.stat-grid{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo"><div class="logo-icon">🔨</div>Docksmith</div>
+  <div class="topbar-sep"></div>
+  <div class="health-dot" id="healthDot"></div>
+  <div class="topbar-stats">
+    <div class="topbar-stat">Images<span class="val" id="ts-img">—</span></div>
+    <div class="topbar-stat">Layers<span class="val" id="ts-lay">—</span></div>
+    <div class="topbar-stat">Cache<span class="val" id="ts-cch">—</span></div>
+    <div class="topbar-stat">Disk<span class="val" id="ts-dsk">—</span></div>
+  </div>
+  <div class="topbar-right">
+    <span class="time-disp" id="clock"></span>
+    <button class="refresh-btn" id="refBtn" onclick="refreshAll()">
+      <svg id="refIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Refresh
+    </button>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="nav-sec-lbl">Overview</div>
+  <div class="nav-item active" onclick="nav('overview',this)" data-v="overview">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Dashboard
+  </div>
+  <div class="nav-sec-lbl">Images</div>
+  <div class="nav-item" onclick="nav('images',this)" data-v="images">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+    Images<span class="nav-badge" id="nb-img">0</span>
+  </div>
+  <div class="nav-item" onclick="nav('layers',this)" data-v="layers">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    Layers<span class="nav-badge" id="nb-lay">0</span>
+  </div>
+  <div class="nav-sec-lbl">Operations</div>
+  <div class="nav-item" onclick="nav('build',this)" data-v="build">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    Build
+  </div>
+  <div class="nav-item" onclick="nav('run',this)" data-v="run">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    Run Container
+  </div>
+  <div class="nav-sec-lbl">System</div>
+  <div class="nav-item" onclick="nav('cache',this)" data-v="cache">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    Cache<span class="nav-badge" id="nb-cch">0</span>
+  </div>
+  <div class="sidebar-foot">
+    ~/.docksmith/<br>
+    <span style="font-size:9px;word-break:break-all" id="ftrDir"></span>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- ═══ OVERVIEW ═══ -->
+<div class="view active" id="view-overview">
+  <div class="stat-grid">
+    <div class="stat-card" style="--card-accent:var(--accent)">
+      <div class="stat-label">Images</div><div class="stat-value" id="sv-img">—</div>
+      <div class="stat-sub">in local store</div><div class="stat-icon">🖼</div>
+    </div>
+    <div class="stat-card" style="--card-accent:var(--accent4)">
+      <div class="stat-label">Layers</div><div class="stat-value" id="sv-lay">—</div>
+      <div class="stat-sub">content-addressed</div><div class="stat-icon">⬡</div>
+    </div>
+    <div class="stat-card" style="--card-accent:var(--accent3)">
+      <div class="stat-label">Cache Entries</div><div class="stat-value" id="sv-cch">—</div>
+      <div class="stat-sub">build cache index</div><div class="stat-icon">⚡</div>
+    </div>
+    <div class="stat-card" style="--card-accent:var(--accent2)">
+      <div class="stat-label">Disk Usage</div><div class="stat-value" id="sv-dsk">—</div>
+      <div class="stat-sub">layers on disk</div><div class="stat-icon">💾</div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span class="panel-title">Layer Sizes by Image</span>
+      </div>
+      <div class="panel-bd"><div id="lbarsWrap" class="lbars"><div class="empty-st"><p>No layers yet</p></div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent4)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+        <span class="panel-title">Image Composition</span>
+      </div>
+      <div class="panel-bd" id="donutWrap"><div class="empty-st"><p>No images yet</p></div></div>
+    </div>
+  </div>
+
+  <div class="g21">
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">Recent Images</span>
+        <div class="panel-acts"><button class="btn btn-ghost btn-sm" onclick="nav('images',document.querySelector('[data-v=images]'))">View all →</button></div>
+      </div>
+      <div style="padding:0">
+        <table class="ds-table"><thead><tr>
+          <th>Name</th><th>Tag</th><th>ID</th><th>Layers</th><th>Size</th><th>Created</th>
+        </tr></thead><tbody id="ovImgTbody"><tr><td colspan="6"><div class="empty-st" style="padding:24px">No images</div></td></tr></tbody></table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title">Store Health</span></div>
+      <div class="panel-bd">
+        <div class="fxc g8 mt4"><div class="sdot ok"></div><span>Images directory</span></div>
+        <div class="fxc g8 mt4"><div class="sdot ok"></div><span>Layers directory</span></div>
+        <div class="fxc g8 mt4"><div class="sdot ok"></div><span>Cache index</span></div>
+        <div class="sep mt12"></div>
+        <div class="mt8 dim" style="font-size:11px">Store path</div>
+        <div class="mt4"><code id="storePathCode">~/.docksmith</code></div>
+        <div class="sep mt12"></div>
+        <div id="diskBreakdown" class="mt8"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ IMAGES ═══ -->
+<div class="view" id="view-images">
+  <div class="view-hd">
+    <div><div class="view-title">Images</div><div class="view-sub">All images in local store</div></div>
+    <div class="view-acts"><button class="btn btn-ghost btn-sm" onclick="loadImages()">↻ Reload</button></div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd"><span class="panel-title">Image Registry</span><span class="panel-sub" id="imgSub"></span></div>
+    <div style="padding:0">
+      <table class="ds-table"><thead><tr>
+        <th>Name</th><th>Tag</th><th>Image ID</th><th>Layers</th><th>Total Size</th><th>Created</th><th>Actions</th>
+      </tr></thead><tbody id="imgTbody"><tr><td colspan="7"><div class="empty-st" style="padding:32px">No images found</div></td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LAYERS ═══ -->
+<div class="view" id="view-layers">
+  <div class="view-hd">
+    <div><div class="view-title">Layer Store</div><div class="view-sub">Content-addressed tar files in ~/.docksmith/layers/</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd"><span class="panel-title">Layer Files</span><span class="panel-sub" id="laySub"></span></div>
+    <div class="scrl" style="padding:0">
+      <table class="ds-table"><thead><tr>
+        <th>Short Digest</th><th>Full Digest</th><th>Size</th>
+      </tr></thead><tbody id="layTbody"><tr><td colspan="3"><div class="empty-st" style="padding:32px">No layers</div></td></tr></tbody></table>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd"><span class="panel-title">Size Distribution</span></div>
+    <div class="panel-bd" id="layDistWrap"><div class="empty-st"><p>No layers</p></div></div>
+  </div>
+</div>
+
+<!-- ═══ BUILD ═══ -->
+<div class="view" id="view-build">
+  <div class="view-hd"><div><div class="view-title">Build Image</div><div class="view-sub">Execute a Docksmithfile build</div></div></div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span class="panel-title">Build Configuration</span>
+      </div>
+      <div class="panel-bd">
+        <div class="frow"><label class="flbl">Image Tag</label><input class="finput" id="bTag" placeholder="myapp:latest" value="myapp:latest"></div>
+        <div class="frow"><label class="flbl">Build Context</label><select class="fsel" id="bCtx"><option value="">Loading…</option></select></div>
+        <div class="frow"><label class="chk-row"><input type="checkbox" id="bNoCache"><span style="font-size:12px">--no-cache (skip all cache lookups)</span></label></div>
+        <button class="btn btn-primary" id="buildBtn" onclick="startBuild()" style="width:100%">▶ Start Build</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title">Step Timeline</span></div>
+      <div class="panel-bd"><div class="tl-wrap" id="stepTl"><div class="empty-st" style="padding:8px"><p>Build output will appear here</p></div></div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span class="panel-title">Build Output</span>
+      <div class="panel-acts" id="bStatus"></div>
+      <button class="btn btn-ghost btn-sm" onclick="clrTerm('bTerm')">Clear</button>
+    </div>
+    <div class="panel-bd" style="padding:12px">
+      <div class="term" id="bTerm"><div class="t-empty">Run a build to see output here…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ RUN ═══ -->
+<div class="view" id="view-run">
+  <div class="view-hd"><div><div class="view-title">Run Container</div><div class="view-sub">Execute a container from an image</div></div></div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span class="panel-title">Run Configuration</span>
+      </div>
+      <div class="panel-bd">
+        <div class="frow"><label class="flbl">Image</label><select class="fsel" id="runImg" onchange="previewImg()"><option value="">Select image…</option></select></div>
+        <div class="frow"><label class="flbl">Command Override <span class="dim">(optional)</span></label><input class="finput" id="runCmd" placeholder="Leave empty to use image CMD"></div>
+        <div class="frow">
+          <div class="fxc g8" style="margin-bottom:6px">
+            <label class="flbl" style="margin-bottom:0">Environment Variables</label>
+            <button class="btn btn-ghost btn-sm" onclick="addEnv()">+ Add</button>
+          </div>
+          <div id="envRows"></div>
+        </div>
+        <button class="btn btn-primary" id="runBtn" onclick="startRun()" style="width:100%">▶ Run Container</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><span class="panel-title">Image Config Preview</span></div>
+      <div class="panel-bd" id="runPreview"><div class="empty-st" style="padding:8px"><p>Select an image</p></div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span class="panel-title">Container Output</span>
+      <div class="panel-acts" id="rStatus"></div>
+      <button class="btn btn-ghost btn-sm" onclick="clrTerm('rTerm')">Clear</button>
+    </div>
+    <div class="panel-bd" style="padding:12px">
+      <div class="term" id="rTerm"><div class="t-empty">Container output will appear here…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CACHE ═══ -->
+<div class="view" id="view-cache">
+  <div class="view-hd">
+    <div><div class="view-title">Build Cache</div><div class="view-sub">Cache index mapping keys → layer digests</div></div>
+    <div class="view-acts"><button class="btn btn-danger btn-sm" onclick="clearCache()">🗑 Clear Cache</button></div>
+  </div>
+  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat-card" style="--card-accent:var(--accent3)"><div class="stat-label">Total Entries</div><div class="stat-value" id="cs-tot">—</div><div class="stat-sub">key→digest</div></div>
+    <div class="stat-card" style="--card-accent:var(--hit)"><div class="stat-label">Valid</div><div class="stat-value" id="cs-val">—</div><div class="stat-sub">layer exists</div></div>
+    <div class="stat-card" style="--card-accent:var(--err)"><div class="stat-label">Stale</div><div class="stat-value" id="cs-stale">—</div><div class="stat-sub">layer missing</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd"><span class="panel-title">Cache Validity</span></div>
+    <div class="panel-bd">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span class="dim" style="font-size:11px;flex:0 0 50px">Valid</span>
+        <div class="prog-bar grow"><div class="prog-fill" id="cValidFill" style="width:0%"></div></div>
+        <span style="font-size:11px;flex:0 0 36px;text-align:right" id="cValidPct">0%</span>
+      </div>
+      <div style="display:flex;gap:20px;margin-top:4px">
+        <div class="fxc g8 dim" style="font-size:11px"><div class="sdot ok"></div>Valid entries point to existing layer files</div>
+        <div class="fxc g8 dim" style="font-size:11px"><div class="sdot err"></div>Stale entries have missing layer files</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd"><span class="panel-title">Cache Index</span><span class="panel-sub" id="cchSub"></span></div>
+    <div class="scrl" style="padding:0">
+      <table class="ds-table"><thead><tr>
+        <th>Cache Key (short)</th><th>Layer Digest</th><th>Status</th>
+      </tr></thead><tbody id="cchTbody"><tr><td colspan="3"><div class="empty-st" style="padding:32px">No cache entries</div></td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title" id="modalTitle">Image Detail</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+/* ── State ── */
+let _images=[], _layers=[], _cache=[], _stats=null;
+const CC=['var(--chart1,var(--accent))','var(--accent2)','var(--accent3)','var(--accent4)','var(--accent5)','#f472b6'];
+
+/* ── Utils ── */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function fmtSz(b){if(!b)return'0 B';const u=['B','KB','MB','GB'];let v=b;for(const u2 of u){if(v<1024)return`${v.toFixed(v<10?1:0)} ${u2}`;v/=1024;}return`${v.toFixed(1)} TB`}
+function fmtDt(iso){if(!iso)return'—';try{const d=new Date(iso);return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return iso}}
+function shortDig(d){return(d||'').replace('sha256:','').slice(0,12)}
+async function api(p,o={}){const r=await fetch(p,o);if(!r.ok){const e=await r.json().catch(()=>({error:r.statusText}));throw new Error(e.error||r.statusText)}return r.json()}
+function clrTerm(id){$(id).innerHTML='<div class="t-empty">Terminal cleared.</div>'}
+function appendTerm(id,text,cls=''){
+  const el=$(id);
+  const em=el.querySelector('.t-empty');if(em)em.remove();
+  const d=document.createElement('div');d.className='tl '+cls;
+  if(!cls){
+    if(/\[CACHE HIT\]/i.test(text))cls='hit';
+    else if(/\[CACHE MISS\]/i.test(text))cls='miss';
+    else if(/^Step \d+/i.test(text))cls='step';
+    else if(/^successfully built/i.test(text))cls='done';
+    else if(/error|failed|exception/i.test(text))cls='err';
+    else if(/^assembling|^starting/i.test(text))cls='meta';
+    d.className='tl '+cls;
+  }
+  d.textContent=text;el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+
+/* ── Clock ── */
+function tick(){$('clock').textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+setInterval(tick,1000);tick();
+
+/* ── Nav ── */
+function nav(name,el){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  $('view-'+name).classList.add('active');
+  const navEl=el||document.querySelector(`[data-v="${name}"]`);
+  if(navEl)navEl.classList.add('active');
+  if(name==='images')loadImages();
+  if(name==='layers')loadLayers();
+  if(name==='cache')loadCache();
+  if(name==='build')loadBuildCtx();
+  if(name==='run')loadRunView();
+}
+
+/* ── Stats ── */
+async function loadStats(){
+  try{
+    _stats=await api('/api/stats');
+    const img=_stats.num_images??_stats.image_count??0;
+    const lay=_stats.num_layers??_stats.layer_count??0;
+    const cch=_stats.num_cache_entries??_stats.cache_entries??0;
+    const dsk=_stats.layers_disk_size_human||fmtSz(_stats.total_layer_bytes||0);
+    ['ts-img','sv-img'].forEach(id=>$(id)&&($(id).textContent=img));
+    ['ts-lay','sv-lay'].forEach(id=>$(id)&&($(id).textContent=lay));
+    ['ts-cch','sv-cch'].forEach(id=>$(id)&&($(id).textContent=cch));
+    ['ts-dsk','sv-dsk'].forEach(id=>$(id)&&($(id).textContent=dsk));
+    $('nb-img').textContent=img; $('nb-lay').textContent=lay; $('nb-cch').textContent=cch;
+    const dir=_stats.docksmith_dir||'~/.docksmith';
+    $('ftrDir').textContent=dir; $('storePathCode').textContent=dir;
+    $('diskBreakdown').innerHTML=`<div style="display:flex;justify-content:space-between;font-size:11px"><span class="dim">Layers</span><span>${dsk}</span></div>`;
+  }catch(e){$('healthDot').style.background='var(--err)'}
+}
+
+/* ── Overview ── */
+async function loadOverview(){
+  await loadStats();
+  _images=await api('/api/images').catch(()=>[]);
+  renderOvTable(); renderLbars(); renderDonut();
+}
+
+function renderOvTable(){
+  const tb=$('ovImgTbody');
+  if(!_images.length){tb.innerHTML='<tr><td colspan="6"><div class="empty-st" style="padding:24px">No images</div></td></tr>';return}
+  tb.innerHTML=_images.slice(0,6).map(m=>`
+    <tr onclick="openModal('${esc(m.name)}','${esc(m.tag)}')" style="cursor:pointer">
+      <td><strong class="hi">${esc(m.name)}</strong></td>
+      <td><span class="tag tb">${esc(m.tag)}</span></td>
+      <td><code>${esc(m.id)}</code></td>
+      <td class="dim">${m.layer_count}</td>
+      <td>${m.total_size_human||fmtSz(m.total_size)}</td>
+      <td class="dim" style="font-size:11px">${fmtDt(m.created)}</td>
+    </tr>`).join('');
+}
+
+function renderLbars(){
+  const el=$('lbarsWrap');
+  if(!_images.length){el.innerHTML='<div class="empty-st"><p>No images yet</p></div>';return}
+  let rows=[];
+  _images.forEach((img,ci)=>{
+    (img.layers||[]).forEach(l=>{
+      rows.push({lbl:(l.created_by||l.createdBy||'unknown').replace(/^(COPY|RUN)\s+/,'').slice(0,32),sz:l.size||0,color:CC[ci%CC.length],img:`${img.name}:${img.tag}`});
+    });
+  });
+  if(!rows.length){el.innerHTML='<div class="empty-st"><p>No layers yet</p></div>';return}
+  const mx=Math.max(...rows.map(r=>r.sz));
+  el.innerHTML='<div class="lbars">'+rows.map(r=>`
+    <div class="lbar-row">
+      <div class="lbar-lbl" title="${esc(r.lbl)}">${esc(r.lbl)}</div>
+      <div class="lbar-track"><div class="lbar-fill" style="width:${mx?(r.sz/mx*100).toFixed(1):0}%;background:${r.color}" data-lbl="${esc(r.img)}"></div></div>
+      <div class="lbar-sz">${fmtSz(r.sz)}</div>
+    </div>`).join('')+'</div>';
+}
+
+function renderDonut(){
+  const el=$('donutWrap');
+  if(!_images.length){el.innerHTML='<div class="empty-st"><p>No images yet</p></div>';return}
+  const items=_images.map((m,i)=>({lbl:`${m.name}:${m.tag}`,val:m.total_size||0,color:CC[i%CC.length]}));
+  const tot=items.reduce((s,i)=>s+i.val,0);
+  if(!tot){el.innerHTML='<div class="empty-st"><p>No size data</p></div>';return}
+  const cx=70,cy=70,r=50,sw=18,circ=2*Math.PI*r;
+  let off=0;
+  const arcs=items.map(it=>{const d=it.val/tot*circ;const a=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${it.color}" stroke-width="${sw}" stroke-dasharray="${d} ${circ-d}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cy})"/>`;off+=d;return a});
+  const leg=items.map(it=>`<div class="donut-item"><div class="donut-dot" style="background:${it.color}"></div><span style="color:var(--text-dim)">${esc(it.lbl)}</span><span class="donut-val" style="margin-left:8px">${fmtSz(it.val)}</span></div>`).join('');
+  el.innerHTML=`<div class="donut-wrap"><svg width="140" height="140" viewBox="0 0 140 140">${arcs.join('')}<text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text-hi)" font-size="13" font-family="Syne,sans-serif" font-weight="700">${items.length}</text><text x="${cx}" y="${cy+14}" text-anchor="middle" fill="var(--text-dim)" font-size="9" font-family="JetBrains Mono,monospace">images</text></svg><div class="donut-leg">${leg}</div></div>`;
+}
+
+/* ── Images view ── */
+async function loadImages(){
+  _images=await api('/api/images').catch(()=>[]);
+  $('imgSub').textContent=`${_images.length} image(s)`;
+  const tb=$('imgTbody');
+  if(!_images.length){tb.innerHTML='<tr><td colspan="7"><div class="empty-st" style="padding:40px">No images</div></td></tr>';return}
+  tb.innerHTML=_images.map(m=>`
+    <tr>
+      <td><strong class="hi">${esc(m.name)}</strong></td>
+      <td><span class="tag tb">${esc(m.tag)}</span></td>
+      <td><code style="font-size:11px">${esc(m.id)}</code></td>
+      <td class="dim">${m.layer_count}</td>
+      <td>${m.total_size_human||fmtSz(m.total_size)}</td>
+      <td class="dim" style="font-size:11px">${fmtDt(m.created)}</td>
+      <td><div class="fxc g8">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('${esc(m.name)}','${esc(m.tag)}')">Detail</button>
+        <button class="btn btn-danger btn-sm" onclick="rmi('${esc(m.name)}','${esc(m.tag)}')">rmi</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+async function rmi(name,tag){
+  if(!confirm(`Remove ${name}:${tag}?\n\nThis deletes the manifest and all layer files.`))return;
+  try{const r=await api(`/api/images/${name}/${tag}`,{method:'DELETE'});alert(r.message||'Removed');await refreshAll()}
+  catch(e){alert('Error: '+e.message)}
+}
+
+/* ── Modal ── */
+async function openModal(name,tag){
+  $('overlay').classList.add('open');
+  $('modalTitle').textContent=`${name}:${tag}`;
+  $('modalBody').innerHTML='<div class="dim" style="padding:20px">Loading…</div>';
+  try{const m=await api(`/api/images/${name}/${tag}`);renderModal(m)}
+  catch(e){$('modalBody').innerHTML=`<div class="tl err">${esc(e.message)}</div>`}
+}
+function renderModal(m){
+  const env=(m.env||m.config?.Env||[]).map(e=>`<div class="env-tag">${esc(e)}</div>`).join('');
+  const cmd=(m.cmd||m.config?.Cmd||[]).join(' ');
+  const layers=(m.layers||[]).map((l,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:0 0 24px;font-size:10px;color:var(--text-dim);text-align:right">#${i+1}</div>
+      <div style="flex:1"><div style="font-size:12px;color:var(--text)">${esc((l.created_by||l.createdBy||'').slice(0,60))}</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px"><code>${esc(l.short_digest||shortDig(l.digest))}</code></div></div>
+      <div style="flex:0 0 70px;text-align:right;font-size:11px;color:var(--text-dim)">${l.size_human||fmtSz(l.size)}</div>
+      <div>${l.exists!==false?'<span class="tag tg">✓</span>':'<span class="tag tr">✗</span>'}</div>
+    </div>`).join('');
+  $('modalBody').innerHTML=`
+    <div class="g2" style="margin-bottom:16px">
+      <div><div class="flbl">Full Digest</div><code style="font-size:10px;word-break:break-all">${esc(m.digest)}</code></div>
+      <div><div class="flbl">Created</div><div style="font-size:12px">${fmtDt(m.created)}</div></div>
+      <div><div class="flbl">Working Dir</div><code>${esc(m.workdir||m.config?.WorkingDir||'/')}</code></div>
+      <div><div class="flbl">CMD</div>${cmd?`<code>${esc(cmd)}</code>`:'<span class="dim">Not set</span>'}</div>
+    </div>
+    <div class="flbl" style="margin-bottom:6px">Environment</div>
+    <div class="env-list">${env||'<span class="dim">None</span>'}</div>
+    <div class="sep mt12"></div>
+    <div class="flbl mt12" style="margin-bottom:8px">Layers (${(m.layers||[]).length}) — ${m.total_size_human||fmtSz(m.total_size)}</div>
+    ${layers||'<div class="dim">No layers</div>'}
+    <div class="fxc g8 mt12" style="justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+      <button class="btn btn-danger" onclick="closeModal();rmi('${esc(m.name)}','${esc(m.tag)}')">🗑 Remove</button>
+    </div>`;
+}
+function closeModal(){$('overlay').classList.remove('open')}
+
+/* ── Layers view ── */
+async function loadLayers(){
+  _layers=await api('/api/layers').catch(()=>[]);
+  $('laySub').textContent=`${_layers.length} file(s)`;
+  const tb=$('layTbody');
+  if(!_layers.length){tb.innerHTML='<tr><td colspan="3"><div class="empty-st" style="padding:40px">No layers</div></td></tr>';$('layDistWrap').innerHTML='<div class="empty-st"><p>No layers</p></div>';return}
+  tb.innerHTML=_layers.map(l=>`
+    <tr>
+      <td><code>${esc(l.digest_short||shortDig(l.digest))}</code></td>
+      <td><span class="dim" style="font-size:11px;word-break:break-all">${esc(l.digest)}</span></td>
+      <td>${l.size_human||fmtSz(l.size)}</td>
+    </tr>`).join('');
+  // Size dist chart
+  const mx=Math.max(..._layers.map(l=>l.size||0));
+  $('layDistWrap').innerHTML='<div class="lbars">'+_layers.map((l,i)=>`
+    <div class="lbar-row">
+      <div class="lbar-lbl"><code style="font-size:10px">${esc(l.digest_short||shortDig(l.digest))}</code></div>
+      <div class="lbar-track"><div class="lbar-fill" style="width:${mx?(l.size/mx*100).toFixed(1):0}%;background:${CC[i%CC.length]}"></div></div>
+      <div class="lbar-sz">${l.size_human||fmtSz(l.size)}</div>
+    </div>`).join('')+'</div>';
+}
+
+/* ── Build ── */
+async function loadBuildCtx(){
+  const ctxs=await api('/api/contexts').catch(()=>[]);
+  const sel=$('bCtx');
+  sel.innerHTML=ctxs.length?ctxs.map(c=>`<option value="${esc(c.path)}">${esc(c.label)}</option>`).join(''):'<option value=".">. (project root)</option>';
+}
+
+function parseBuildStep(line){const m=line.match(/^Step (\d+)\/(\d+)\s*:\s*(.+)/i);return m?{step:m[1],tot:m[2],instr:m[3]}:null}
+
+let _tlSteps=[];
+function renderTl(){
+  const el=$('stepTl');
+  if(!_tlSteps.length){el.innerHTML='<div class="empty-st" style="padding:8px"><p>No steps yet</p></div>';return}
+  el.innerHTML=_tlSteps.map(s=>{
+    const dotCls=s.hit===null?'running':s.hit?'':'miss';
+    const badge=s.hit===null?'<span class="tag ty" style="font-size:10px">…</span>':s.hit?'<span class="tag tg" style="font-size:10px">HIT</span>':'<span class="tag to" style="font-size:10px">MISS</span>';
+    return`<div class="tl-item"><div class="tl-dot ${dotCls}"></div><div class="tl-content">
+      <div class="tl-title">Step ${s.step}/${s.tot} ${badge}</div>
+      <div class="tl-meta">${esc(s.instr)}</div></div></div>`;
+  }).join('');
+}
+
+function startBuild(){
+  const tag=$('bTag').value.trim(), ctx=$('bCtx').value, noCache=$('bNoCache').checked;
+  if(!tag){alert('Image tag required');return}
+  clrTerm('bTerm'); _tlSteps=[];$('stepTl').innerHTML='';
+  $('bStatus').innerHTML='<span class="tag tb">Building…</span>';
+  $('buildBtn').disabled=true;
+  appendTerm('bTerm',`$ docksmith build -t ${tag}${noCache?' --no-cache':''} ${ctx}`,'meta');
+  fetch('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag,context:ctx,no_cache:noCache})})
+    .then(res=>{
+      const rdr=res.body.getReader();const dec=new TextDecoder();let buf='';
+      function rd(){rdr.read().then(({done,value})=>{
+        if(done)return;buf+=dec.decode(value,{stream:true});
+        const pts=buf.split('\n\n');buf=pts.pop();
+        pts.forEach(pt=>{const dl=pt.split('\n').find(l=>l.startsWith('data:'));if(!dl)return;
+          try{const msg=JSON.parse(dl.slice(5));
+            if(msg.line!==undefined){
+              appendTerm('bTerm',msg.line);
+              const st=parseBuildStep(msg.line);
+              if(st){_tlSteps.push({...st,hit:null});renderTl()}
+              if(_tlSteps.length){
+                if(/\[CACHE HIT\]/i.test(msg.line)){_tlSteps[_tlSteps.length-1].hit=true;renderTl()}
+                else if(/\[CACHE MISS\]/i.test(msg.line)){_tlSteps[_tlSteps.length-1].hit=false;renderTl()}
+              }
+            }
+            if(msg.done){const ok=msg.returncode===0;$('bStatus').innerHTML=ok?'<span class="tag tg">✓ Done</span>':'<span class="tag tr">✗ Failed</span>';$('buildBtn').disabled=false;if(ok)refreshAll()}
+          }catch{}
+        });rd();
+      });}rd();
+    }).catch(e=>{appendTerm('bTerm','Error: '+e.message,'err');$('buildBtn').disabled=false});
+}
+
+/* ── Run ── */
+async function loadRunView(){
+  _images=await api('/api/images').catch(()=>[]);
+  const sel=$('runImg');
+  sel.innerHTML=_images.length?_images.map(m=>`<option value="${esc(m.name)}:${esc(m.tag)}">${esc(m.name)}:${esc(m.tag)}</option>`).join(''):'<option value="">No images</option>';
+  previewImg();
+}
+function previewImg(){
+  const val=$('runImg').value;if(!val){$('runPreview').innerHTML='<div class="empty-st" style="padding:8px"><p>Select an image</p></div>';return}
+  const[name,tag]=val.split(':');const m=_images.find(i=>i.name===name&&i.tag===tag);if(!m)return;
+  const env=(m.env||m.config?.Env||[]).map(e=>`<div class="env-tag">${esc(e)}</div>`).join('');
+  const cmd=(m.cmd||m.config?.Cmd||[]).join(' ');
+  $('runPreview').innerHTML=`
+    <div class="flbl">CMD</div><div style="margin-bottom:10px">${cmd?`<code>${esc(cmd)}</code>`:'<span class="dim">Not set</span>'}</div>
+    <div class="flbl">WORKDIR</div><div style="margin-bottom:10px"><code>${esc(m.workdir||m.config?.WorkingDir||'/')}</code></div>
+    <div class="flbl">ENV</div><div class="env-list mt4">${env||'<span class="dim">None</span>'}</div>
+    <div class="sep mt12"></div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:8px">${m.layer_count} layers · ${m.total_size_human||fmtSz(m.total_size)}</div>`;
+}
+function addEnv(k='',v=''){
+  const r=document.createElement('div');r.className='env-row';
+  r.innerHTML=`<input placeholder="KEY" value="${esc(k)}" class="ek"><input placeholder="value" value="${esc(v)}" class="ev"><button class="env-rm" onclick="this.parentElement.remove()">✕</button>`;
+  $('envRows').appendChild(r);
+}
+function startRun(){
+  const nt=$('runImg').value,cmd=$('runCmd').value.trim();
+  if(!nt){alert('Select an image');return}
+  const envList=[...$('envRows').querySelectorAll('.env-row')].map(r=>{const k=r.querySelector('.ek').value.trim(),v=r.querySelector('.ev').value.trim();return k?`${k}=${v}`:''}).filter(Boolean);
+  clrTerm('rTerm');$('rStatus').innerHTML='<span class="tag tb">Running…</span>';$('runBtn').disabled=true;
+  appendTerm('rTerm',`$ docksmith run${envList.map(e=>` -e ${e}`).join('')} ${nt}${cmd?' '+cmd:''}`,'meta');
+  fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name_tag:nt,cmd,env:envList})})
+    .then(res=>{
+      const rdr=res.body.getReader();const dec=new TextDecoder();let buf='';
+      function rd(){rdr.read().then(({done,value})=>{
+        if(done)return;buf+=dec.decode(value,{stream:true});
+        const pts=buf.split('\n\n');buf=pts.pop();
+        pts.forEach(pt=>{const dl=pt.split('\n').find(l=>l.startsWith('data:'));if(!dl)return;
+          try{const msg=JSON.parse(dl.slice(5));
+            if(msg.line!==undefined)appendTerm('rTerm',msg.line);
+            if(msg.done){const ok=msg.returncode===0;$('rStatus').innerHTML=ok?`<span class="tag tg">✓ Exit 0</span>`:`<span class="tag tr">✗ Exit ${msg.returncode}</span>`;$('runBtn').disabled=false}
+          }catch{}
+        });rd();
+      });}rd();
+    }).catch(e=>{appendTerm('rTerm','Error: '+e.message,'err');$('runBtn').disabled=false});
+}
+
+/* ── Cache ── */
+async function loadCache(){
+  let data=await api('/api/cache').catch(()=>[]);
+  _cache=Array.isArray(data)?data:(data.entries||[]);
+  const valid=_cache.filter(e=>e.layer_exists!==undefined?e.layer_exists:e.exists).length;
+  const stale=_cache.length-valid;
+  $('cs-tot').textContent=_cache.length; $('cs-val').textContent=valid; $('cs-stale').textContent=stale;
+  $('cchSub').textContent=`${_cache.length} entries`;
+  const pct=_cache.length?Math.round(valid/_cache.length*100):0;
+  $('cValidFill').style.width=pct+'%'; $('cValidPct').textContent=pct+'%';
+  const tb=$('cchTbody');
+  if(!_cache.length){tb.innerHTML='<tr><td colspan="3"><div class="empty-st" style="padding:40px">Cache is empty</div></td></tr>';return}
+  tb.innerHTML=_cache.map(e=>{const ex=e.layer_exists!==undefined?e.layer_exists:e.exists;return`
+    <tr>
+      <td><code style="font-size:10px">${esc(e.key_short||e.short_key||(e.key||'').slice(0,20)+'…')}</code></td>
+      <td><code style="font-size:10px">${esc(e.digest_short||e.short_digest||shortDig(e.digest))}</code></td>
+      <td>${ex?'<span class="tag tg">✓ exists</span>':'<span class="tag tr">✗ missing</span>'}</td>
+    </tr>`}).join('');
+}
+async function clearCache(){
+  if(!confirm('Clear the entire build cache index?'))return;
+  try{const r=await api('/api/cache',{method:'DELETE'});alert(r.message||'Cache cleared');await loadCache();await loadStats()}
+  catch(e){alert('Error: '+e.message)}
+}
+
+/* ── Refresh ── */
+async function refreshAll(){
+  const btn=$('refBtn');btn.classList.add('spin');
+  try{
+    await loadOverview();
+    const av=document.querySelector('.view.active');
+    if(av){const id=av.id.replace('view-','');
+      if(id==='images')await loadImages();
+      else if(id==='layers')await loadLayers();
+      else if(id==='cache')await loadCache();
+    }
+  }finally{btn.classList.remove('spin')}
+}
+
+/* ── Init ── */
+(async()=>{await loadOverview();setInterval(loadStats,30000)})();
+</script>
+</body>
+</html>
