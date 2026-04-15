@@ -78,8 +78,5 @@ class ImageManifest:
         return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
 
     def finalize_digest(self):
-        d = self.to_dict()
-        d["digest"] = ""
-        canonical = json.dumps(d)  # missing sort_keys=True, separators
-        self.digest = "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
-
+        """Set self.digest to the computed digest."""
+        self.digest = self.compute_digest()
