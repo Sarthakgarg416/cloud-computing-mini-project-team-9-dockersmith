@@ -5,7 +5,7 @@ Build cache - deterministic cache key computation and hit/miss tracking.
 import hashlib
 import json
 import os
-from typing import Optional, List
+from typing import List, Optional
 
 from internal.store.image_store import cache_index_path, layer_path
 
@@ -24,6 +24,18 @@ def _save_index(index: dict):
         json.dump(index, f, indent=2)
 
 
+def _stable_env_state(env_state: dict) -> str:
+    """Serialize environment state in a canonical order."""
+    return "\n".join(f"{key}={value}" for key, value in sorted(env_state.items()))
+
+
+def _stable_copy_hashes(copy_file_hashes: Optional[List[str]]) -> str:
+    """Serialize COPY source hashes in a canonical order."""
+    if not copy_file_hashes:
+        return ""
+    return "\n".join(sorted(copy_file_hashes))
+
+
 def compute_cache_key(
     prev_digest: str,
     instruction_text: str,
@@ -32,27 +44,24 @@ def compute_cache_key(
     copy_file_hashes: Optional[List[str]] = None,
 ) -> str:
     """
-    Compute a deterministic cache key from all relevant inputs.
+    Return the SHA-256 cache key for a build step.
+
+    The key is derived from the five inputs defined by the cache spec:
+    previous layer digest, full instruction text, current workdir, current
+    environment state, and (for COPY) the hashes of all source files.
     """
     h = hashlib.sha256()
-    h.update(prev_digest.encode())
-    h.update(b"\x00")
-    h.update(instruction_text.encode())
-    h.update(b"\x00")
-    h.update(workdir.encode())
-    h.update(b"\x00")
 
-    # ENV: lexicographically sorted key=value pairs
-    env_sorted = sorted(f"{k}={v}" for k, v in env_state.items())
-    env_str = "\n".join(env_sorted)
-    h.update(env_str.encode())
-    h.update(b"\x00")
-
-    # COPY: sorted file hashes
-    if copy_file_hashes:
-        for fh in sorted(copy_file_hashes):
-            h.update(fh.encode())
-            h.update(b"\x00")
+    # Keep field boundaries explicit so each input contributes independently.
+    for value in (
+        prev_digest,
+        instruction_text,
+        workdir,
+        _stable_env_state(env_state),
+        _stable_copy_hashes(copy_file_hashes),
+    ):
+        h.update(value.encode())
+        h.update(b"\x00")
 
     return "sha256:" + h.hexdigest()
 
