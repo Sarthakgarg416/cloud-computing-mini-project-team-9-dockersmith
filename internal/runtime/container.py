@@ -5,12 +5,11 @@ Container runtime - assembles image filesystem and runs containers.
 import os
 import sys
 import tempfile
-import subprocess as _sp
-import shlex as _shlex
 from typing import Dict, List, Optional
 
 from internal.store.image_store import ImageStore, layer_path
 from internal.build.layers import assemble_filesystem
+from internal.runtime.isolate import pick_isolator
 
 
 class ContainerRuntime:
@@ -40,7 +39,7 @@ class ContainerRuntime:
             )
             raise SystemExit(1)
 
-        # Build environment
+        # Build environment: image ENV first, then overrides
         env = {}
         for pair in manifest.config.Env:
             k, _, v = pair.partition("=")
@@ -54,26 +53,25 @@ class ContainerRuntime:
         layer_paths = [layer_path(l.digest) for l in manifest.layers]
 
         with tempfile.TemporaryDirectory(prefix="docksmith_rootfs_") as rootfs:
+            # Create required dirs inside rootfs
             for d in ["proc", "sys", "dev", "tmp"]:
                 os.makedirs(os.path.join(rootfs, d), exist_ok=True)
 
             print(f"Assembling filesystem from {len(layer_paths)} layer(s)...")
             assemble_filesystem(layer_paths, rootfs)
 
+            # Ensure workdir exists
             wd_abs = os.path.join(rootfs, workdir.lstrip("/"))
             os.makedirs(wd_abs, exist_ok=True)
 
             print(f"Starting container: {' '.join(command)}")
             print("-" * 40)
 
-            # ✅ UPDATED: direct chroot execution (no pick_isolator)
-            _cmd_str = " ".join(_shlex.quote(a) for a in command)
-
-            result = _sp.run(
-                ["chroot", rootfs, "/bin/sh", "-c",
-                 f"cd {_shlex.quote(workdir)} 2>/dev/null || cd /; exec {_cmd_str}"],
+            result = pick_isolator(
+                rootfs,
+                command,
+                workdir=workdir,
                 env=env,
-                stdin=_sp.DEVNULL,
             )
 
             print("-" * 40)
